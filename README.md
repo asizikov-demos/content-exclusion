@@ -4,7 +4,20 @@ This repository demonstrates how to enforce **content exclusion** for GitHub Cop
 
 ## The Problem
 
-When Copilot agents operate autonomously, they have access to powerful tools (file reads, shell commands, grep, etc.). Organization-level content exclusion settings may restrict certain files, but a determined agent could attempt to work around those restrictions using alternative tools. This repo shows how to build **defense in depth** so that excluded content stays excluded — even when an AI agent is driving.
+GitHub Copilot's [content exclusion settings](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/configure-content-exclusion/exclude-content-from-copilot) allow organizations to prevent Copilot from accessing certain files. When content is excluded:
+
+- Inline suggestions are not available in affected files.
+- Excluded content does not inform suggestions in other files.
+- Excluded content does not inform Copilot Chat responses.
+- Affected files are not reviewed in Copilot code review.
+
+However, as the [documentation notes](https://docs.github.com/en/enterprise-cloud@latest/copilot/concepts/content-exclusion-for-github-copilot#limitations-of-content-exclusion):
+
+> **Content exclusion is currently not supported in Edit and Agent modes of Copilot Chat in Visual Studio Code and other editors.**
+
+This means that when Copilot operates **as an agent** — autonomously making tool calls to read files, run shell commands, and search code — the platform-level content exclusion alone is not enforced. An agent could read, modify, or leak excluded content through its tool calls.
+
+This repo shows how to build **defense in depth** so that excluded content stays excluded — even in agentic scenarios.
 
 ## Architecture
 
@@ -22,7 +35,7 @@ Sensitive content lives in `data-input/` (CSV files) and select infrastructure f
 
 ### 1. Repository Content Exclusion Settings — Organization-Level Policy
 
-The first line of defense is [GitHub Copilot content exclusion](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/configure-content-exclusion/exclude-content-from-copilot), configured at the organization or repository level. These settings tell Copilot to ignore matching files across **all** Copilot features — completions, chat, and agentic interactions alike.
+The first line of defense is [GitHub Copilot content exclusion](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/configure-content-exclusion/exclude-content-from-copilot), configured at the organization or repository level. These settings tell Copilot to ignore matching files across completions, chat, and code review.
 
 The exclusion patterns for this repository match the `.copilotignore` content:
 
@@ -34,7 +47,7 @@ The exclusion patterns for this repository match the `.copilotignore` content:
 /DataProcessor.Infra/Database/BillingRepository.cs
 ```
 
-This is the broadest layer: it applies before any code reaches the agent, preventing excluded content from appearing in suggestions or being sent as context.
+This is the broadest layer and covers most Copilot features automatically. However, it [does not currently apply to Edit and Agent modes](https://docs.github.com/en/enterprise-cloud@latest/copilot/concepts/content-exclusion-for-github-copilot#limitations-of-content-exclusion), which is why the remaining layers exist.
 
 ### 2. `.copilotignore` — In-Repo Declarative Exclusion
 
@@ -117,7 +130,7 @@ Each layer compensates for potential gaps in the others:
 
 | Layer | Type | Strength | Limitation |
 |-------|------|----------|------------|
-| Content exclusion settings | Organization-level | Broadest coverage — all Copilot features | Requires org/repo admin access to configure |
+| Content exclusion settings | Organization-level | Broadest coverage — completions, chat, code review | Does not apply to Edit and Agent modes |
 | `.copilotignore` | Platform-enforced | Automatic, version-controlled | Only covers platform-native file reads |
 | `PreToolUse` hook | Runtime enforcement | Intercepts all registered tool calls | Must be kept in sync with tool names |
 | `AGENTS.md` | Behavioral | Covers edge cases and indirect attempts | Relies on agent compliance |
