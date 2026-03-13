@@ -125,6 +125,12 @@ extract_paths_for_tool() {
     read_file)
       jq -r '.tool_input.filePath? // empty' <<< "$event_json"
       ;;
+    edit_file)
+      jq -r '.tool_input.filePath? // empty' <<< "$event_json"
+      ;;
+    insert_edit_into_file)
+      jq -r '.tool_input.filePath? // empty' <<< "$event_json"
+      ;;
     edit_notebook_file)
       jq -r '.tool_input.filePath? // empty' <<< "$event_json"
       ;;
@@ -145,6 +151,64 @@ extract_paths_for_tool() {
         | sed 's/[[:space:]]*$//'
       ;;
   esac
+}
+
+check_terminal_command_for_excluded_paths() {
+  local tool_name="$1"
+  local event_json="$2"
+  local cwd="$3"
+  shift 3
+  local command_str
+
+  case "$tool_name" in
+    run_in_terminal|run_command)
+      command_str="$(jq -r '.tool_input.command? // empty' <<< "$event_json")"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+
+  [[ -z "$command_str" ]] && return 1
+
+  # Replace shell operators with spaces for simple tokenization
+  local sanitized="$command_str"
+  sanitized="${sanitized//&&/ }"
+  sanitized="${sanitized//||/ }"
+  sanitized="${sanitized//|/ }"
+  sanitized="${sanitized//;/ }"
+  sanitized="${sanitized//>/ }"
+  sanitized="${sanitized//</ }"
+
+  local -a tokens
+  read -ra tokens <<< "$sanitized"
+
+  local token candidate matched_pattern
+
+  for token in "${tokens[@]}"; do
+    # Strip surrounding quotes from token
+    token="$(strip_quotes "$token")"
+
+    # Handle git show <ref>:<path> — extract path after colon
+    if [[ "$token" == *:* ]]; then
+      candidate="${token##*:}"
+      if [[ -n "$candidate" ]]; then
+        candidate="$(strip_quotes "$candidate")"
+        if matched_pattern="$(check_candidate_against_patterns "$candidate" "$cwd" "$@")"; then
+          printf '%s\t%s\n' "$candidate" "$matched_pattern"
+          return 0
+        fi
+      fi
+    fi
+
+    # Check the token itself as a potential path
+    if [[ -n "$token" ]] && matched_pattern="$(check_candidate_against_patterns "$token" "$cwd" "$@")"; then
+      printf '%s\t%s\n' "$token" "$matched_pattern"
+      return 0
+    fi
+  done
+
+  return 1
 }
 
 search_targets_excluded_content() {
@@ -177,7 +241,7 @@ search_targets_excluded_content() {
 }
 
 main() {
-  local event_json cwd tool_name search_match search_value search_pattern matched_pattern path pattern
+  local event_json cwd tool_name search_match search_value search_pattern matched_pattern path pattern terminal_match terminal_value terminal_pattern
   local -a patterns
 
   event_json="$(cat)"
@@ -206,6 +270,13 @@ main() {
   if search_match="$(search_targets_excluded_content "$tool_name" "$event_json" "$cwd" "${patterns[@]}")"; then
     IFS=$'\t' read -r search_value search_pattern <<< "$search_match"
     emit_deny "$search_value" "$search_pattern"
+    return 0
+  fi
+
+  # Check terminal/shell commands for excluded paths
+  if terminal_match="$(check_terminal_command_for_excluded_paths "$tool_name" "$event_json" "$cwd" "${patterns[@]}")"; then
+    IFS=$'\t' read -r terminal_value terminal_pattern <<< "$terminal_match"
+    emit_deny "$terminal_value" "$terminal_pattern"
     return 0
   fi
 
