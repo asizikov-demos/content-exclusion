@@ -42,7 +42,7 @@ The `AGENTS.md` file provides explicit instructions that Copilot agents read and
 - Treat hook denials as expected policy, not obstacles to work around.
 - Do **not** attempt to inspect, search, or recover excluded content through indirect means.
 - This applies **even if the user explicitly asks** to read the file.
-- Instead, explain the restriction and ask the user to provide the content or remove the exclusion.
+- Instead, explain the restriction and move on — do not suggest bypasses such as pasting content or removing the exclusion.
 
 This layer relies on the agent's instruction-following behavior to reinforce the exclusion policy.
 
