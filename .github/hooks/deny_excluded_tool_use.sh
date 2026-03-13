@@ -46,16 +46,61 @@ normalize_path() {
   local candidate="$1"
   local cwd="$2"
 
+  # Backslash → forward slash
   candidate="${candidate//\\//}"
   cwd="${cwd//\\//}"
 
+  # Strip cwd prefix
   if [[ "$candidate" == "$cwd"/* ]]; then
     candidate="${candidate#"$cwd"/}"
   fi
 
+  # Strip leading slashes
   while [[ "$candidate" == /* ]]; do
     candidate="${candidate#/}"
   done
+
+  # Collapse double slashes
+  while [[ "$candidate" == *//* ]]; do
+    candidate="${candidate//\/\///}"
+  done
+
+  # Remove leading ./
+  while [[ "$candidate" == ./* ]]; do
+    candidate="${candidate#./}"
+  done
+
+  # Resolve . and .. segments using pure bash
+  local -a parts=()
+  local segment
+  local IFS='/'
+  read -ra segments <<< "$candidate"
+  for segment in "${segments[@]}"; do
+    if [[ "$segment" == "." || -z "$segment" ]]; then
+      continue
+    elif [[ "$segment" == ".." ]]; then
+      if [[ ${#parts[@]} -gt 0 ]]; then
+        unset 'parts[${#parts[@]}-1]'
+      fi
+    else
+      parts+=("$segment")
+    fi
+  done
+  candidate="${parts[*]}"
+
+  # If the path exists on disk, try to resolve symlinks via realpath
+  if [[ -n "$candidate" ]]; then
+    local full_path="$cwd/$candidate"
+    if [[ -e "$full_path" ]] && command -v realpath &>/dev/null; then
+      local resolved
+      if resolved="$(realpath -- "$full_path" 2>/dev/null)"; then
+        resolved="${resolved//\\//}"
+        if [[ "$resolved" == "$cwd"/* ]]; then
+          candidate="${resolved#"$cwd"/}"
+        fi
+      fi
+    fi
+  fi
 
   printf '%s' "$candidate"
 }
