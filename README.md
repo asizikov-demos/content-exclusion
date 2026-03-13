@@ -98,23 +98,17 @@ User asks agent to read excluded file
           ▼
 ┌─────────────────────────┐
 │  Org/repo content       │  ← Repository content exclusion settings
-│  exclusion settings     │    Prevents content from reaching Copilot at all
-│  (blocks completions,   │
-│   chat, and agent       │
-│   context)              │
+│  exclusion settings     │    Blocks completions, chat, and code review
+│  (does NOT cover agent  │    (does not apply to agent mode)
+│   mode)                 │
 └────────┬────────────────┘
          │ Agent makes a tool call
          ▼
 ┌─────────────────────────┐
-│  Platform-level check   │  ← .copilotignore patterns applied by Copilot platform
-│  (blocks direct reads)  │
-└────────┬────────────────┘
-         │ If tool call slips through
-         ▼
-┌─────────────────────────┐
 │  PreToolUse Hook        │  ← .github/hooks/deny_excluded_tool_use.sh
-│  (blocks any tool call  │    Parses .copilotignore, inspects tool input,
-│   targeting excluded     │    emits deny with reason
+│  (reads .copilotignore, │    Parses patterns, inspects tool input,
+│   blocks any tool call  │    emits deny with reason
+│   targeting excluded     │
 │   paths)                │
 └────────┬────────────────┘
          │ If somehow not caught
@@ -131,8 +125,7 @@ Each layer compensates for potential gaps in the others:
 | Layer | Type | Strength | Limitation |
 |-------|------|----------|------------|
 | Content exclusion settings | Organization-level | Broadest coverage — completions, chat, code review | Does not apply to Edit and Agent modes |
-| `.copilotignore` | Platform-enforced | Automatic, version-controlled | Only covers platform-native file reads |
-| `PreToolUse` hook | Runtime enforcement | Intercepts all registered tool calls | Must be kept in sync with tool names |
+| `.copilotignore` + `PreToolUse` hook | Runtime enforcement | Intercepts tool calls targeting excluded paths | Must be kept in sync with tool names |
 | `AGENTS.md` | Behavioral | Covers edge cases and indirect attempts | Relies on agent compliance |
 | `CODEOWNERS` | Change protection | Prevents policy weakening via PR | Requires branch protection rules |
 
