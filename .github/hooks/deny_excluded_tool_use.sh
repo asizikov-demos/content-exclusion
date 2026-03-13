@@ -256,6 +256,48 @@ check_terminal_command_for_excluded_paths() {
   return 1
 }
 
+# ── Tool classification ──────────────────────────────────────────────
+# To allow a new tool that accesses files, add it to KNOWN_TOOLS and
+# teach extract_paths_for_tool / search / terminal helpers to inspect it.
+# To allow a tool that never touches file content, add it to SAFE_TOOLS.
+
+is_known_tool() {
+  local name="$1"
+  case "$name" in
+    # File tools (paths extracted and checked against .copilotignore)
+    create_file|read_file|edit_file|insert_edit_into_file|edit_notebook_file) return 0 ;;
+    list_dir|create_directory|get_errors|apply_patch) return 0 ;;
+    # Search tools
+    file_search|grep_search) return 0 ;;
+    # Terminal tools
+    run_in_terminal|run_command) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_safe_tool() {
+  local name="$1"
+  case "$name" in
+    # Tools that never access file content — safe to allow unconditionally
+    thinking|copilot_mcp) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+emit_deny_unknown() {
+  local tool="$1"
+  jq -cn \
+    --arg tool "$tool" \
+    '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: ("Unknown tool \u0027" + $tool + "\u0027 blocked by default-deny policy. Add it to the known or safe tools list in deny_excluded_tool_use.sh if it should be allowed.")
+      },
+      systemMessage: "Unknown tools are blocked by default. Update the hook to allow this tool."
+    }'
+}
+
 search_targets_excluded_content() {
   local tool_name="$1"
   local event_json="$2"
@@ -333,7 +375,14 @@ main() {
     fi
   done < <(extract_paths_for_tool "$tool_name" "$event_json")
 
-  emit_allow
+  # ── Default-deny: only allow tools we recognise ──────────────────
+  if is_known_tool "$tool_name"; then
+    emit_allow
+  elif is_safe_tool "$tool_name"; then
+    emit_allow
+  else
+    emit_deny_unknown "$tool_name"
+  fi
 }
 
 main "$@"
