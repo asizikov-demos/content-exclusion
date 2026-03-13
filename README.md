@@ -90,6 +90,16 @@ The `CODEOWNERS` file requires review from a designated owner (`@asizikov`) for 
 
 This prevents the agent (or anyone else) from weakening the exclusion policy without human approval.
 
+> **⚠️ Note: Branch protection is not currently enabled on `main`.**
+>
+> `CODEOWNERS` reviews are only enforced when branch protection (or repository rulesets) are active. Without them, contributors — including AI agents — can push directly to `main` and bypass code-owner review.
+>
+> **Recommended branch protection settings for `main`:**
+>
+> - ✅ Require a pull request before merging
+> - ✅ Require review from code owners
+> - ✅ Do not allow bypassing the above settings
+
 ## How the Layers Work Together
 
 ```
