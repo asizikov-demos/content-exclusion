@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="DataProcessor.App/DataProcessor.App.csproj" />
+  <Project Path="DataProcessor.Domain/DataProcessor.Domain.csproj" />
+  <Project Path="DataProcessor.Infra/DataProcessor.Infra.csproj" />
+</Solution>
