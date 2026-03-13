@@ -74,11 +74,16 @@ The hook provides **hard runtime enforcement** that the agent cannot bypass. It 
 - **`content-exclusion-guard.json`** — Registers a `PreToolUse` hook that runs before every tool call.
 - **`deny_excluded_tool_use.sh`** — A Bash script that:
   1. Reads the `.copilotignore` patterns.
-  2. Extracts file paths from the incoming tool call (supports `read_file`, `create_file`, `edit_notebook_file`, `apply_patch`, `grep_search`, `file_search`, and more).
-  3. Matches extracted paths against exclusion patterns.
-  4. Returns a **deny** decision with a clear reason if any path matches, or **allow** otherwise.
+  2. Extracts file paths from the incoming tool call and matches them against exclusion patterns.
+  3. Returns a **deny** decision with a clear reason if any path matches, or **allow** otherwise.
 
-This means even if the agent ignores `AGENTS.md` instructions and attempts a shell `cat` or grep on an excluded file, the hook intercepts the tool call and blocks it.
+  The script intercepts three categories of tool calls:
+
+  - **File-based tools** — `read_file`, `edit_file`, `insert_edit_into_file`, `create_file`, `edit_notebook_file`, `list_dir`, `create_directory`, `get_errors`, `apply_patch`
+  - **Search tools** — `file_search` (query parameter), `grep_search` (includePattern parameter)
+  - **Shell/terminal commands** — `run_in_terminal` and `run_command`: tokenizes the command string and checks each argument against exclusion patterns, including `git show <ref>:<path>` style commands that access file content through git objects.
+
+This means even if the agent ignores `AGENTS.md` instructions and attempts a shell `cat`, grep, or `git show` on an excluded file, the hook intercepts the tool call and blocks it.
 
 ### Bonus: `CODEOWNERS` — Change Protection
 
@@ -135,7 +140,7 @@ Each layer compensates for potential gaps in the others:
 | Layer | Type | Strength | Limitation |
 |-------|------|----------|------------|
 | Content exclusion settings | Organization-level | Broadest coverage — completions, chat, code review | Does not apply to Edit and Agent modes |
-| `.copilotignore` + `PreToolUse` hook | Runtime enforcement | Intercepts tool calls targeting excluded paths | Must be kept in sync with tool names |
+| `.copilotignore` + `PreToolUse` hook | Runtime enforcement | Intercepts file, search, and shell/terminal tool calls targeting excluded paths | Must be kept in sync with tool names |
 | `AGENTS.md` | Behavioral | Covers edge cases and indirect attempts | Relies on agent compliance |
 | `CODEOWNERS` | Change protection | Prevents policy weakening via PR | Requires branch protection rules |
 
