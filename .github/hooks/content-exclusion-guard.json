@@ -1,0 +1,12 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": "bash .github/hooks/deny_excluded_tool_use.sh",
+        "windows": "bash .github/hooks/deny_excluded_tool_use.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}

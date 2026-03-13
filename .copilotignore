@@ -1,0 +1,5 @@
+- "**.csv"
+- "**/.env"
+- "/data-input/**"
+- "/DataProcessor.Infra/Csv/*.cs"
+- "/DataProcessor.Infra/Database/BillingRepository.cs"
