@@ -1,6 +1,6 @@
 # Content Exclusion Demo
 
-This repository demonstrates how to enforce **content exclusion** for GitHub Copilot in agentic scenarios using three complementary layers of defense.
+This repository demonstrates how to enforce **content exclusion** for GitHub Copilot in agentic scenarios using four complementary layers of defense.
 
 ## The Problem
 
@@ -18,23 +18,31 @@ The sample project is a .NET solution (`DataProcessor.slnx`) with three projects
 
 Sensitive content lives in `data-input/` (CSV files) and select infrastructure files (billing repository, CSV parsers).
 
-## Three Layers of Content Exclusion
+## Four Layers of Content Exclusion
 
-### 1. `.copilotignore` — Declarative File Exclusion
+### 1. Repository Content Exclusion Settings — Organization-Level Policy
 
-The `.copilotignore` file works similarly to `.gitignore` and declares which files should be excluded from Copilot's context:
+The first line of defense is [GitHub Copilot content exclusion](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/configure-content-exclusion/exclude-content-from-copilot), configured at the organization or repository level. These settings tell Copilot to ignore matching files across **all** Copilot features — completions, chat, and agentic interactions alike.
+
+The exclusion patterns for this repository match the `.copilotignore` content:
 
 ```
-- "**.csv"
-- "**/.env"
-- "/data-input/**"
-- "/DataProcessor.Infra/Csv/*.cs"
-- "/DataProcessor.Infra/Database/BillingRepository.cs"
+**.csv
+**/.env
+/data-input/**
+/DataProcessor.Infra/Csv/*.cs
+/DataProcessor.Infra/Database/BillingRepository.cs
 ```
 
-This tells the platform to block direct reads of these paths. However, on its own, it may not cover every tool an agent could use.
+This is the broadest layer: it applies before any code reaches the agent, preventing excluded content from appearing in suggestions or being sent as context.
 
-### 2. `AGENTS.md` — Behavioral Instructions for the Agent
+### 2. `.copilotignore` — In-Repo Declarative Exclusion
+
+The `.copilotignore` file mirrors the organization-level settings as an in-repo declaration. It works similarly to `.gitignore` and serves as a local reference that other layers (like the `PreToolUse` hook) can read to enforce the same patterns at runtime.
+
+While the org-level settings are the authoritative source, `.copilotignore` ensures the patterns are version-controlled, visible in code review, and consumable by hooks.
+
+### 3. `AGENTS.md` — Behavioral Instructions for the Agent
 
 The `AGENTS.md` file provides explicit instructions that Copilot agents read and follow:
 
@@ -46,7 +54,7 @@ The `AGENTS.md` file provides explicit instructions that Copilot agents read and
 
 This layer relies on the agent's instruction-following behavior to reinforce the exclusion policy.
 
-### 3. `.github/hooks/` — Pre-Tool-Use Hook (Runtime Enforcement)
+### 4. `.github/hooks/` — Pre-Tool-Use Hook (Runtime Enforcement)
 
 The hook provides **hard runtime enforcement** that the agent cannot bypass. It consists of:
 
@@ -76,6 +84,15 @@ User asks agent to read excluded file
           │
           ▼
 ┌─────────────────────────┐
+│  Org/repo content       │  ← Repository content exclusion settings
+│  exclusion settings     │    Prevents content from reaching Copilot at all
+│  (blocks completions,   │
+│   chat, and agent       │
+│   context)              │
+└────────┬────────────────┘
+         │ Agent makes a tool call
+         ▼
+┌─────────────────────────┐
 │  Platform-level check   │  ← .copilotignore patterns applied by Copilot platform
 │  (blocks direct reads)  │
 └────────┬────────────────┘
@@ -100,7 +117,8 @@ Each layer compensates for potential gaps in the others:
 
 | Layer | Type | Strength | Limitation |
 |-------|------|----------|------------|
-| `.copilotignore` | Platform-enforced | Automatic, no agent cooperation needed | Only covers platform-native file reads |
+| Content exclusion settings | Organization-level | Broadest coverage — all Copilot features | Requires org/repo admin access to configure |
+| `.copilotignore` | Platform-enforced | Automatic, version-controlled | Only covers platform-native file reads |
 | `PreToolUse` hook | Runtime enforcement | Intercepts all registered tool calls | Must be kept in sync with tool names |
 | `AGENTS.md` | Behavioral | Covers edge cases and indirect attempts | Relies on agent compliance |
 | `CODEOWNERS` | Change protection | Prevents policy weakening via PR | Requires branch protection rules |
