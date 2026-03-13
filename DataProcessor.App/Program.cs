@@ -2,14 +2,29 @@
 using DataProcessor.Infra.Csv;
 using DataProcessor.Infra.Database;
 
-if (args.Length == 0)
+string filePath;
+if (args.Length > 0)
 {
-    Console.Error.WriteLine("Usage: DataProcessor <csv-file-path>");
-    Console.Error.WriteLine("  Provide the path to a Premium Request billing report CSV file.");
-    return 1;
+    filePath = args[0];
+}
+else
+{
+    var dataInputDir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data-input");
+    var candidates = Directory.Exists(dataInputDir)
+        ? Directory.GetFiles(dataInputDir, "*.csv")
+        : [];
+
+    if (candidates.Length == 0)
+    {
+        Console.Error.WriteLine("Usage: DataProcessor [csv-file-path]");
+        Console.Error.WriteLine("  No argument provided and no CSV files found in data-input/.");
+        return 1;
+    }
+
+    filePath = candidates[0];
+    Console.WriteLine($"No file argument provided — using data-input/{Path.GetFileName(filePath)}");
 }
 
-var filePath = args[0];
 if (!File.Exists(filePath))
 {
     Console.Error.WriteLine($"Error: File not found: {filePath}");

@@ -3,3 +3,4 @@ obj/
 *.db
 *.user
 .vs/
+data-input/
